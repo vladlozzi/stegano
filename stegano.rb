@@ -1,4 +1,4 @@
-class Stegano
+class Steganography
   #
   # This class supports:
   #   - ASCII 8-bit string_to_encrypt only
@@ -29,6 +29,14 @@ class Stegano
     replace_last_bits_in_red
     replace_layers_in_pixels_area
     create_and_write_target_bitmap
+    true
+  end
+
+  def decrypt
+    read_pixels_area
+    get_encrypted_string_length
+    get_encrypted_string
+    @decrypted_string
   end
 
   private
@@ -74,54 +82,17 @@ class Stegano
       end
   end
 
-end
-
-def stegano_decrypt(image)
-  #
-  # This method supports:
-  #   - ASCII 8-bit string_to_encrypt only
-  #   - 24-bit bitmap images only
-  #
-  if File.file?(image)
-    puts "Yes, encrypted image file \"#{image}\" exists."
-    # Read info from bitmap file.
-    image_bmp = File.binread(image)
-    return nil if image_bmp[0..1] != 'BM'
-    image_length = image_bmp[2..5].unpack('l').first
-    pixels_offset = image_bmp[10..13].unpack('l').first
-    pixels_width = image_bmp[18..21].unpack('L').first
-    pixels_height = image_bmp[22..25].unpack('L').first
-    bpp = image_bmp[28..29].unpack('s').first
-    return nil if bpp != 24
-
-    puts "Image file length is #{image_length} byte(s)."
-    puts "Pixel datas offset is #{pixels_offset}."
-    puts "Image size is #{pixels_width}x#{pixels_height} (#{bpp} bpp)."
-
-    # Read pixels area.
-    pixels_area = image_bmp[pixels_offset..-1]
-    pixels_area_bin = pixels_area.chars.map{ |c| c.unpack('C').first.to_s(2) }
-
+  def get_encrypted_string_length
     # Select blue layer and read length of encrypted string from its initial four bytes.
-    string_length = pixels_area_bin.select.each_with_index{ |_, i| i % 3 == 2 }[0..3].join.to_i(2)
+    @string_length = @pixels_area_bin.select.
+      each_with_index{ |_, i| i % 3 == 2 }[0..3].join.to_i(2)
+  end
 
+  def get_encrypted_string
     # Select red layer and read last bit in each byte.
-    red_layer = pixels_area_bin.select.each_with_index{ |_, i| i % 3 == 0 }[0..(string_length * 8) - 1]
-    decrypted_string = red_layer.map{ |byte| byte[7] }.join.scan(/\d{8}/).map{ |byte| byte.to_i(2).chr }.join
-
-    puts "Yes, encrypted string was extracted from image file successfully."
-    decrypted_string
-  else
-    puts "Oops, encrypted bmp file \"#{image}\" not found."
+    red_layer = @pixels_area_bin.select.
+      each_with_index{ |_, i| i % 3 == 0 }[0..(@string_length * 8) - 1]
+    @decrypted_string = red_layer.map{ |byte| byte[7] }.join.
+      scan(/\d{8}/).map{ |byte| byte.to_i(2).chr }.join
   end
 end
-
-# Stegano class using example.
-string_to_encrypt = "Glory to Ukraine! Glory to Heroes! Glory Forever!"
-source = "samsung860pro512Gb.bmp"
-target = "ssd_samsung860pro512Gb.bmp"
-
-stegano = Stegano.new(source, string_to_encrypt, target)
-stegano.encrypt
-
-p stegano_decrypt(target) == string_to_encrypt # Should be true.
